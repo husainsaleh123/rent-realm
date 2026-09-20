@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, supabaseConfigured } from './supabase';
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { jsPDF } from 'jspdf';
@@ -114,6 +114,18 @@ function Auth({ hasAccounts, onLogin, onRegister, lang, setLang }) {
   </main>;
 }
 
+function AuthConfigurationError() {
+  return <main className="auth-page auth-config-page">
+    <section className="auth-form-wrap">
+      <div className="auth-form" role="alert">
+        <span className="eyebrow">CONFIGURATION REQUIRED</span>
+        <h2>Authentication is temporarily unavailable</h2>
+        <p>The deployment is missing its Supabase environment variables. Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> in Vercel, then redeploy.</p>
+      </div>
+    </section>
+  </main>;
+}
+
 function Sidebar({ page, setPage, onLogout, open, setOpen, lang, setLang, theme, setTheme, user, onSettings }) {
   const links = [
     ['dashboard', LayoutDashboard, 'Overview'], ['properties', Building2, 'Properties'],
@@ -213,6 +225,7 @@ function RecordPayment({tenant,legacy,onClose,onSave}) {
 function AddProperty({ onClose,onSave,initial,lang }) { const [f,setF]=useState(initial||{name:'',address:'',units:'',image:''}); const t=s=>tx(lang,s); return <Modal title={t(initial?'Edit property':'Add a property')} subtitle={t(initial?'Update the property information below.':'Create a new property in your portfolio.')} onClose={onClose}><form className="modal-form" onSubmit={e=>{e.preventDefault();onSave({...f,units:Number(f.units)})}}><ImageField property value={f.image} onChange={image=>setF({...f,image})} lang={lang}/><label>{t('Property name')}<input required autoFocus value={f.name} onChange={e=>setF({...f,name:e.target.value})} placeholder="e.g. Bay View Residence"/></label><label>{t('Location or address')}<input required value={f.address} onChange={e=>setF({...f,address:e.target.value})} placeholder="e.g. Amwaj Islands"/></label><label>{t('Number of units')}<input required min="1" type="number" value={f.units} onChange={e=>setF({...f,units:e.target.value})} placeholder="10"/></label><div className="modal-actions"><button type="button" className="secondary" onClick={onClose}>{t('Cancel')}</button><button className="primary">{initial?<Pencil size={17}/>:<Building2 size={17}/>} {t(initial?'Save changes':'Add property')}</button></div></form></Modal> }
 
 function App() {
+ if(!supabaseConfigured)return <AuthConfigurationError/>;
  const [session,setSession]=useState(null);
  const [authLoading,setAuthLoading]=useState(true);
  const [data,setData]=useState(emptyData);
