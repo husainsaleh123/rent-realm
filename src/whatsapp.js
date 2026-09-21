@@ -9,7 +9,8 @@ export function whatsappNumber(phone = '') {
 }
 export function paymentMessage(receipt) {
   const month = new Date(`${receipt.month}-02T12:00:00`).toLocaleDateString('en-GB', {month:'long',year:'numeric'});
-  return `Hello ${receipt.tenant.name},\n\nYour rent for ${month} has been paid.\nProperty: ${receipt.property} · ${receipt.tenant.unit}\nAmount received: BHD ${Number(receipt.amount).toFixed(3)}\nPayment date: ${receipt.date.split('-').reverse().join('/')}\nPayment method: ${receipt.method}\nReceipt No.: ${receipt.number}\n\nThank you,\n${receipt.issuer.username || 'Rent Realm'}`;
+  const balance = Number(receipt.balance || 0);
+  return `Hello ${receipt.tenant.name},\n\nYour rent payment for ${month} has been received.\nProperty: ${receipt.property} · ${receipt.tenant.unit}\nAmount received: BHD ${Number(receipt.amount).toFixed(3)}${balance > 0 ? `\nRemaining balance: BHD ${balance.toFixed(3)}` : ''}\nPayment date: ${receipt.date.split('-').reverse().join('/')}\nPayment method: ${receipt.method}\nReceipt No.: ${receipt.number}\n\nThank you,\n${receipt.issuer.username || 'Rent Realm'}`;
 }
 export function paymentWhatsAppUrl(receipt) {
   const number = whatsappNumber(receipt.tenant.phone);
