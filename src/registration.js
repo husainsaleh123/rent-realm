@@ -6,9 +6,10 @@ export function normalizeContactPhone(value) {
   else if (!raw.startsWith('+') && /^\d{8}$/.test(digits)) digits = `973${digits}`;
   return /^[1-9]\d{7,14}$/.test(digits) ? `+${digits}` : '';
 }
-export function registrationMetadata({email, phone}) {
+export function registrationMetadata({displayName, phone}) {
+  const username = String(displayName || '').trim();
+  if (username.length < 2) throw new Error('Display name must be at least 2 characters.');
   const contact = normalizeContactPhone(phone);
   if (!contact) throw new Error('Enter a valid phone number with country code.');
-  const username = String(email || '').split('@')[0].trim() || 'Rentora user';
   return {username, full_name: username, phone: contact, role: 'property_owner'};
 }

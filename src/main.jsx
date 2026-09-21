@@ -26,7 +26,7 @@ const ar = {
   'YOUR PORTFOLIO':'محفظتك','All properties':'جميع العقارات','properties':'عقارات','Tenants':'المستأجرون','Units':'الوحدات','Monthly rent':'الإيجار الشهري','Search tenants or units':'ابحث عن مستأجر أو وحدة','active tenants':'مستأجرون نشطون','Tenant':'المستأجر','Property':'العقار','Unit':'الوحدة','Paid':'مدفوع','Unpaid':'غير مدفوع','Expected':'المتوقع','Viewing month':'الشهر المعروض','PAYMENT REGISTER':'سجل الدفعات','Click a status to update':'اضغط على الحالة لتحديثها','Mark as paid':'تحديد كمدفوع',
   'Edit tenant':'تعديل المستأجر','Add a new tenant':'إضافة مستأجر جديد','Update their personal, property, or rent details.':'حدّث البيانات الشخصية أو العقار أو الإيجار.','Enter their lease and rent details.':'أدخل تفاصيل العقد والإيجار.','Full name':'الاسم الكامل','Select property':'اختر العقار','Monthly rent (BHD)':'الإيجار الشهري (د.ب)','Move-in date':'تاريخ بدء السكن','Phone number':'رقم الهاتف','Photo (optional)':'الصورة (اختيارية)','Upload photo':'رفع صورة','Change photo':'تغيير الصورة','Cancel':'إلغاء','Save changes':'حفظ التغييرات',
   'Edit property':'تعديل العقار','Create a new property in your portfolio.':'أنشئ عقاراً جديداً في محفظتك.','Update the property information below.':'حدّث بيانات العقار أدناه.','Property name':'اسم العقار','Location or address':'الموقع أو العنوان','Number of units':'عدد الوحدات','Property photo (optional)':'صورة العقار (اختيارية)','English':'English','Arabic':'العربية','Language':'اللغة',
-  'Welcome to Rent Realm':'مرحباً بك في رنت ريلم','Welcome back':'مرحباً بعودتك','Sign up with your email, phone number, and password.':'سجّل باستخدام بريدك الإلكتروني ورقم هاتفك وكلمة المرور.','Enter your password to continue to your portfolio.':'أدخل كلمة المرور للمتابعة إلى محفظتك.','Password':'كلمة المرور','Confirm password':'تأكيد كلمة المرور','Create account':'إنشاء حساب','Log in':'تسجيل الدخول','SECURE ACCESS':'دخول آمن','Delete property':'حذف العقار','Delete tenant':'حذف المستأجر',
+  'Welcome to Rent Realm':'مرحباً بك في رنت ريلم','Welcome back':'مرحباً بعودتك','Sign up with your email, phone number, and password.':'سجّل باستخدام بريدك الإلكتروني ورقم هاتفك وكلمة المرور.','Sign up with your display name, email, phone number, and password.':'سجّل باستخدام اسم العرض والبريد الإلكتروني ورقم الهاتف وكلمة المرور.','Enter your password to continue to your portfolio.':'أدخل كلمة المرور للمتابعة إلى محفظتك.','Password':'كلمة المرور','Confirm password':'تأكيد كلمة المرور','Create account':'إنشاء حساب','Log in':'تسجيل الدخول','SECURE ACCESS':'دخول آمن','Delete property':'حذف العقار','Delete tenant':'حذف المستأجر',
   'Your properties':'عقاراتك','Property Manager':'مدير العقارات','Owner account':'حساب المالك','Rent due':'الإيجار المستحق','Status':'الحالة','Property & unit':'العقار والوحدة','Remove':'إزالة','of':'من','Every property.':'كل عقار.','Every payment.':'كل دفعة.','Perfectly clear.':'بكل وضوح.','RENT MANAGEMENT, SIMPLIFIED':'إدارة الإيجارات بكل سهولة','A calm, organized space to manage your tenants and stay on top of every month.':'مساحة منظمة وسهلة لإدارة المستأجرين ومتابعة كل شهر.','Enter your password':'أدخل كلمة المرور','Repeat your password':'أعد إدخال كلمة المرور','Passwords do not match.':'كلمتا المرور غير متطابقتين.','Delete this property and all of its tenants?':'هل تريد حذف هذا العقار وجميع مستأجريه؟','Remove this tenant?':'هل تريد إزالة هذا المستأجر؟','No properties yet':'لا توجد عقارات بعد','No tenants yet':'لا يوجد مستأجرون بعد','Rent contract':'عقد الإيجار','Upload contract':'رفع العقد','Replace contract':'استبدال العقد','View contract':'عرض العقد','Download PDF':'تنزيل PDF','PDF or image, up to 10 MB':'ملف PDF أو صورة، حتى 10 ميجابايت','Contract file must be a PDF or image under 10 MB.':'يجب أن يكون ملف العقد PDF أو صورة بحجم أقل من 10 ميجابايت.'
 };
 const tx = (lang, text) => lang === 'ar' ? (ar[text] || text) : text;
@@ -61,6 +61,7 @@ function Modal({ title, subtitle, onClose, children }) {
 
 function Auth({ hasAccounts, onLogin, onRegister, lang, setLang }) {
   const [mode, setMode] = useState(hasAccounts?'login':'register');
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [value, setValue] = useState('');
@@ -73,13 +74,14 @@ function Auth({ hasAccounts, onLogin, onRegister, lang, setLang }) {
   async function submit(e) {
     e.preventDefault(); setError(''); setNotice('');
     const normalizedEmail=email.trim().toLowerCase();
+    if(setup && displayName.trim().length<2)return setError('Display name must be at least 2 characters.');
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail))return setError('Enter a valid email address.');
     if(setup && !normalizeContactPhone(phone))return setError('Enter a valid phone number with country code.');
     if (value.length < 6) return setError('Password must be at least 6 characters.');
     if (setup && value !== confirm) return setError('Passwords do not match.');
     setSubmitting(true);
     try {
-      const result=setup?await onRegister({phone:normalizeContactPhone(phone),email:normalizedEmail,password:value}):await onLogin({email:normalizedEmail,password:value});
+      const result=setup?await onRegister({displayName:displayName.trim(),phone:normalizeContactPhone(phone),email:normalizedEmail,password:value}):await onLogin({email:normalizedEmail,password:value});
       if(result?.error)setError(result.error);
       if(result?.message){setNotice(result.message);setMode('login');setValue('');setConfirm('')}
     } catch(error) { setError(error.message); } finally { setSubmitting(false); }
@@ -100,8 +102,9 @@ function Auth({ hasAccounts, onLogin, onRegister, lang, setLang }) {
         </div>}
         <span className="eyebrow">{t('SECURE ACCESS')}</span>
         <h2>{t(setup ? 'Create your account' : 'Welcome back')}</h2>
-        <p>{t(setup ? 'Sign up with your email, phone number, and password.' : 'Use your email and password to access your portfolio.')}</p>
-        <label>{t('Email address')}<input required autoFocus type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@example.com"/><Mail size={18}/></label>
+        <p>{t(setup ? 'Sign up with your display name, email, phone number, and password.' : 'Use your email and password to access your portfolio.')}</p>
+        {setup&&<label>{t('Display name')}<input required minLength="2" autoFocus type="text" autoComplete="name" value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder={t('Display name')}/></label>}
+        <label>{t('Email address')}<input required autoFocus={!setup} type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@example.com"/><Mail size={18}/></label>
         {setup&&<label>{t('Mobile number')}<input required type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+973 0000 0000"/></label>}
         <label>{t('Password')}<input required minLength="6" type={showPassword?'text':'password'} autoComplete={setup?'new-password':'current-password'} value={value} onChange={e=>setValue(e.target.value)} placeholder={t('Enter your password')}/><button className="password-toggle" type="button" title={t(showPassword?'Hide password':'Show password')} onClick={()=>setShowPassword(!showPassword)}>{showPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button></label>
         {setup && <label>{t('Confirm password')}<input required minLength="6" type={showPassword?'text':'password'} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder={t('Repeat your password')}/><KeyRound size={18}/></label>}
@@ -261,8 +264,8 @@ function App() {
  const saveTenant=async f=>{const {contractFile,...fields}=f;const tenantId=fields.id||crypto.randomUUID();let contractPath=fields.contractPath;let contractName=fields.contractName;if(contractFile){const safeName=contractFile.name.replace(/[^a-zA-Z0-9._-]/g,'_');const nextPath=`${session.user.id}/${tenantId}/${crypto.randomUUID()}-${safeName}`;const {error}=await supabase.storage.from('tenant-contracts').upload(nextPath,contractFile,{contentType:contractFile.type});if(error){alert(`Contract upload failed: ${error.message}`);return}if(contractPath)await supabase.storage.from('tenant-contracts').remove([contractPath]);contractPath=nextPath;contractName=contractFile.name}const saved={...fields,id:tenantId,contractPath,contractName};setData(d=>({...d,tenants:fields.id?d.tenants.map(t=>t.id===fields.id?saved:t):[...d.tenants,saved]}));setModal(null)};
  const saveProperty=f=>{setData(d=>({...d,properties:f.id?d.properties.map(p=>p.id===f.id?f:p):[...d.properties,{...f,id:crypto.randomUUID()}]}));setModal(null)};
  const viewContract=async tenant=>{const {data:signed,error}=await supabase.storage.from('tenant-contracts').createSignedUrl(tenant.contractPath,60,{download:tenant.contractName||'rent-contract'});if(error){alert(`Could not open contract: ${error.message}`);return}const link=document.createElement('a');link.href=signed.signedUrl;link.download=tenant.contractName||'rent-contract';link.rel='noopener';link.click()};
- const register = async ({ phone, email, password }) => {
-  let metadata;try{metadata=registrationMetadata({email,phone})}catch(error){return {error:error.message}}
+ const register = async ({ displayName, phone, email, password }) => {
+  let metadata;try{metadata=registrationMetadata({displayName,phone})}catch(error){return {error:error.message}}
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
