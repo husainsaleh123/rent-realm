@@ -9,13 +9,14 @@ import {
   Plus, Search, Settings, TrendingUp, UserPlus, Users, Wallet, X, Check,
   AlertCircle, CalendarDays, Trash2, Pencil, Globe2, Camera, Moon, Sun,
   Eye, EyeOff, Mail, FileText, Download
-  , ArrowRight, BellRing, CheckCircle2, ShieldCheck, Sparkles
+  , ArrowRight, BellRing, CheckCircle2, ShieldCheck, Sparkles, PlayCircle, Video, Clock, MessageCircle
 } from 'lucide-react';
 import './styles.css';
 import { normalizeContactPhone, registrationMetadata } from './registration';
 import { paymentRows } from './paymentRows';
 import { createReceipt, downloadReceipt, localDate, receiptDocument } from './receipts';
 import { addPaymentTransaction, amountCollected, amountOutstanding, latestReceipt, paymentStatus } from './paymentAmounts';
+import { paymentWhatsAppUrl, shareReceipt } from './whatsapp';
 
 const STORAGE_KEY = 'rentora-data-v1';
 const DEFAULT_PROPERTY_IMAGE = '/images/default-property.webp';
@@ -121,7 +122,23 @@ function Auth({ hasAccounts, onLogin, onRegister, lang, setLang, initialMode='lo
   </main>;
 }
 
+function LandingPreviewModal({ mode, copy, onClose }) {
+  const [sent,setSent]=useState(false);
+  const bookingEmail=import.meta.env.VITE_BOOKING_EMAIL?.trim()||'hello@rentrealm.app';
+  const submit=e=>{
+    e.preventDefault();
+    const form=new FormData(e.currentTarget);
+    const subject=`Rent Realm virtual meeting — ${form.get('platform')}`;
+    const body=[`Name: ${form.get('name')}`,`Email: ${form.get('email')}`,`Preferred date: ${form.get('date')}`,`Preferred time: ${form.get('time')} (Bahrain time)`,`Platform: ${form.get('platform')}`,`Notes: ${form.get('notes')||'—'}`].join('\n');
+    window.location.href=`mailto:${bookingEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    setSent(true);
+  };
+  if(mode==='demo')return <Modal title={copy.demoTitle} subtitle={copy.demoModalBody} onClose={onClose}><div className="demo-coming-soon"><span><PlayCircle size={34}/></span><strong>{copy.demoSoon}</strong><p>{copy.demoSoonBody}</p><button className="landing-primary" onClick={onClose}>{copy.gotIt}</button></div></Modal>;
+  return <Modal title={copy.bookTitle} subtitle={copy.bookModalBody} onClose={onClose}><form className="modal-form booking-form" onSubmit={submit}><label>{copy.name}<input required name="name" autoComplete="name"/></label><label>{copy.email}<input required name="email" type="email" autoComplete="email" placeholder="name@example.com"/></label><div className="form-row"><label>{copy.date}<input required name="date" type="date" min={localDate()}/></label><label>{copy.time}<input required name="time" type="time"/></label></div><label>{copy.platform}<select required name="platform" defaultValue="Google Meet"><option>Google Meet</option><option>Microsoft Teams</option><option>Zoom</option></select></label><label>{copy.notes}<textarea name="notes" rows="3" placeholder={copy.notesPlaceholder}/></label>{sent&&<p className="booking-notice"><CheckCircle2 size={16}/>{copy.emailOpened}</p>}<div className="modal-actions"><button type="button" className="secondary" onClick={onClose}>{copy.cancel}</button><button className="landing-primary" type="submit"><CalendarDays size={17}/>{copy.requestMeeting}</button></div></form></Modal>;
+}
+
 function LandingPage({ onAccess, lang, setLang }) {
+  const [preview,setPreview]=useState(null);
   const copy = lang==='ar' ? {
     nav:['المزايا','كيف يعمل','لماذا رنت ريلم'], login:'تسجيل الدخول', start:'ابدأ الآن',
     eyebrow:'ودّع مطاردة الإيجارات',
@@ -133,7 +150,8 @@ function LandingPage({ onAccess, lang, setLang }) {
     howTitle:'من عقار جديد إلى تحصيل واضح', howBody:'سير عمل بسيط يساعدك على إنجاز العمل الإداري بسرعة.',
     steps:[['01','أضف عقاراتك','سجّل الوحدات والعناوين ونظّم محفظتك.'],['02','اربط المستأجرين','احفظ بيانات التواصل والإيجار والعقود.'],['03','تابع كل دفعة','سجّل التحصيل وشاهد المستحق وأصدر الإيصالات.']],
     close:'عقارات أقل تعقيداً. وقت أكثر لك.', closeBody:'ابدأ بتنظيم محفظتك اليوم واجعل متابعة الإيجار مهمة بسيطة وواضحة.',
-    dashboard:'لوحة المحفظة', collected:'المحصّل هذا الشهر', outstanding:'المتبقي', tenants:'المستأجرون', ontrack:'معدل التحصيل', attention:'يحتاج للمتابعة', paid:'مدفوع', due:'مستحق'
+    dashboard:'لوحة المحفظة', collected:'المحصّل هذا الشهر', outstanding:'المتبقي', tenants:'المستأجرون', ontrack:'معدل التحصيل', attention:'يحتاج للمتابعة', paid:'مدفوع', due:'مستحق',
+    previewKicker:'تريد أن تتأكد أولاً؟', previewTitle:'تعرّف على رنت ريلم بطريقتك', previewBody:'شاهد جولة سريعة في المنتج أو احجز لقاءً افتراضياً مع المالك لمناقشة احتياجاتك.', demoTitle:'شاهد العرض التوضيحي', demoBody:'جولة قصيرة توضّح لك إدارة العقارات والمستأجرين والدفعات.', demoSoon:'الفيديو قريباً', demoSoonBody:'نعمل على إعداد جولة واضحة ومختصرة للمنتج. ستتوفر هنا قريباً.', watchDemo:'شاهد العرض', comingSoon:'قريباً', bookTitle:'احجز لقاءً افتراضياً', bookBody:'اختر الوقت والمنصة المناسبة لك وتحدث مباشرة مع المالك.', bookMeeting:'اختر موعداً', bookModalBody:'اختر موعدك المفضل. سيؤكد المالك الموعد ويرسل رابط الاجتماع.', name:'الاسم الكامل', email:'البريد الإلكتروني', date:'التاريخ المفضل', time:'الوقت المفضل', platform:'منصة الاجتماع', notes:'ملاحظات (اختياري)', notesPlaceholder:'ما الذي تود مناقشته؟', requestMeeting:'اطلب الموعد', cancel:'إلغاء', emailOpened:'تم فتح تطبيق البريد لإرسال طلبك.', gotIt:'حسناً'
   } : {
     nav:['Features','How it works','Why Rent Realm'], login:'Log in', start:'Get started',
     eyebrow:'STOP CHASING RENT. START RUNNING IT.',
@@ -145,7 +163,8 @@ function LandingPage({ onAccess, lang, setLang }) {
     howTitle:'From new property to clear collection', howBody:'A simple workflow that gets the admin out of your way.',
     steps:[['01','Add your properties','Record units and addresses, then organize your portfolio.'],['02','Connect your tenants','Keep contact details, rent amounts, and contracts close.'],['03','Track every payment','Record collections, see balances, and issue receipts.']],
     close:'Less property admin. More time for you.', closeBody:'Start organizing your portfolio today and make rent follow-up feel refreshingly simple.',
-    dashboard:'Portfolio overview', collected:'Collected this month', outstanding:'Outstanding', tenants:'Active tenants', ontrack:'Collection rate', attention:'Needs attention', paid:'Paid', due:'Due'
+    dashboard:'Portfolio overview', collected:'Collected this month', outstanding:'Outstanding', tenants:'Active tenants', ontrack:'Collection rate', attention:'Needs attention', paid:'Paid', due:'Due',
+    previewKicker:'NOT READY TO COMMIT?', previewTitle:'Get to know Rent Realm your way', previewBody:'Watch a quick product tour or book a virtual conversation with the owner to discuss what you need.', demoTitle:'Watch the demo', demoBody:'A short walkthrough of properties, tenants, payments, and receipts.', demoSoon:'Demo video coming soon', demoSoonBody:'We are preparing a clear, concise product tour. It will be available right here soon.', watchDemo:'Watch demo', comingSoon:'Coming soon', bookTitle:'Book a virtual meeting', bookBody:'Choose a time and platform that suit you, then speak directly with the owner.', bookMeeting:'Choose a time', bookModalBody:'Choose your preferred slot. The owner will confirm it and send the meeting link.', name:'Full name', email:'Email address', date:'Preferred date', time:'Preferred time', platform:'Meeting platform', notes:'Notes (optional)', notesPlaceholder:'What would you like to discuss?', requestMeeting:'Request meeting', cancel:'Cancel', emailOpened:'Your email app has opened so you can send the request.', gotIt:'Got it'
   };
   useEffect(()=>{
     const elements=[...document.querySelectorAll('.landing-page .reveal')];
@@ -160,10 +179,12 @@ function LandingPage({ onAccess, lang, setLang }) {
       <div className="product-stage" aria-label={copy.dashboard}><div className="stage-glow"/><div className="product-window"><div className="window-top"><div className="mini-logo"><Building2 size={16}/></div><span>{copy.dashboard}</span><div className="window-dots"><i/><i/><i/></div></div><div className="window-body"><div className="mock-sidebar"><b><Building2 size={15}/></b>{[Home,Building2,Users,Wallet].map((Icon,i)=><i className={i===0?'active':''} key={i}><Icon size={15}/></i>)}</div><div className="mock-content"><div className="mock-heading"><div><span>SEPTEMBER 2026</span><strong>{copy.dashboard}</strong></div><button>+ {copy.tenants}</button></div><div className="mock-stats"><article><span>{copy.collected}</span><b>BHD 4,850</b><small>12 {copy.paid}</small></article><article><span>{copy.outstanding}</span><b>BHD 650</b><small>2 {copy.due}</small></article><article><span>{copy.tenants}</span><b>14</b><small>4 properties</small></article></div><div className="mock-lower"><div className="mock-chart"><span>{copy.ontrack}</span><div className="chart-row"><div className="mock-donut"><b>88%</b></div><div className="chart-bars"><i/><i/><i/><i/><i/><i/></div></div></div><div className="mock-list"><span>{copy.attention}</span><div><i>AK</i><p><b>Ahmed K.</b><small>Seef · 4A</small></p><strong>BHD 350</strong></div><div><i>LM</i><p><b>Layla M.</b><small>Amwaj · 2C</small></p><strong>BHD 300</strong></div></div></div></div></div></div><div className="floating-proof proof-one"><CheckCircle2 size={18}/><span><b>{copy.paid}</b>Receipt ready</span></div><div className="floating-proof proof-two"><BellRing size={18}/><span><b>{copy.attention}</b>2 payments</span></div></div>
     </section>
     <div className="trust-strip"><ShieldCheck size={18}/><span>{copy.trusted}</span><i/><span>Clear monthly tracking</span><i/><span>Secure account access</span></div>
+    <section className="preview-section reveal" id="preview"><div className="preview-heading"><span className="section-kicker">{copy.previewKicker}</span><h2>{copy.previewTitle}</h2><p>{copy.previewBody}</p></div><div className="preview-options"><article><span className="preview-icon"><PlayCircle size={26}/></span><span className="soon-badge">{copy.comingSoon}</span><h3>{copy.demoTitle}</h3><p>{copy.demoBody}</p><button className="landing-secondary" onClick={()=>setPreview('demo')}>{copy.watchDemo}<PlayCircle size={17}/></button></article><article><span className="preview-icon"><Video size={26}/></span><h3>{copy.bookTitle}</h3><p>{copy.bookBody}</p><button className="landing-primary" onClick={()=>setPreview('booking')}>{copy.bookMeeting}<Clock size={17}/></button></article></div></section>
     <section className="landing-section benefits reveal" id="features"><div className="section-kicker">WHY RENT REALM</div><h2>{copy.howTitle}</h2><p className="section-lead">{copy.howBody}</p><div className="benefit-grid">{copy.benefits.map(([title,body],i)=>{const Icon=[TrendingUp,FileText,CheckCircle2,Users,BellRing,Globe2][i];return <article style={{'--delay':`${i*70}ms`}} key={title}><span><Icon size={23}/></span><h3>{title}</h3><p>{body}</p></article>})}</div></section>
     <section className="how-section reveal" id="how"><div className="how-copy"><span className="section-kicker">HOW IT WORKS</span><h2>{copy.howTitle}</h2><p>{copy.howBody}</p><button className="landing-primary" onClick={()=>onAccess('register')}>{copy.cta}<ArrowRight size={18}/></button></div><div className="steps">{copy.steps.map(([number,title,body],i)=><article style={{'--delay':`${i*110}ms`}} key={number}><span>{number}</span><div><h3>{title}</h3><p>{body}</p></div></article>)}</div></section>
     <section className="closing-cta reveal" id="why"><div><span className="section-kicker">READY WHEN YOU ARE</span><h2>{copy.close}</h2><p>{copy.closeBody}</p></div><button className="landing-primary light" onClick={()=>onAccess('register')}>{copy.cta}<ArrowRight size={18}/></button></section>
     <footer className="landing-footer"><div className="landing-logo"><span><Building2 size={19}/></span>Rent Realm</div><p>© {new Date().getFullYear()} Rent Realm</p><button onClick={()=>onAccess('login')}>{copy.login}</button></footer>
+    {preview&&<LandingPreviewModal mode={preview} copy={copy} onClose={()=>setPreview(null)}/>}
   </main>;
 }
 
@@ -265,9 +286,10 @@ function AccountSettings({user,onClose,onSave,onChangePassword}) {
 }
 
 function ReceiptPreview({receipt,onClose}) {
- const [url,setUrl]=useState('');
- useEffect(()=>{const objectUrl=URL.createObjectURL(receiptDocument(receipt).output('blob'));setUrl(objectUrl);return ()=>URL.revokeObjectURL(objectUrl)},[receipt]);
- return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal receipt-modal" role="dialog" aria-modal="true" aria-label={t('Receipt voucher')} onMouseDown={e=>e.stopPropagation()}><div className="modal-head"><div><h2>{t('Receipt voucher')}</h2><p>{receipt.number} · {receipt.tenant.name}</p></div><button className="icon-btn" aria-label={t('Close')} onClick={onClose}><X size={20}/></button></div><div className="receipt-toolbar">{url&&<a className="secondary" href={url} target="_blank" rel="noopener noreferrer">{t('Open PDF')}</a>}<button className="primary" onClick={()=>downloadReceipt(receipt)}><Download size={16}/>{t('Download receipt')}</button></div>{url&&<iframe className="receipt-preview" src={url} title={t('Receipt voucher')}/>}</div></div>;
+ const [pdf,setPdf]=useState({url:'',file:null});const [shareNotice,setShareNotice]=useState('');
+ useEffect(()=>{const blob=receiptDocument(receipt).output('blob');const objectUrl=URL.createObjectURL(blob);const file=new File([blob],`receipt-${receipt.number.replace(/\//g,'-')}.pdf`,{type:'application/pdf'});setPdf({url:objectUrl,file});return ()=>URL.revokeObjectURL(objectUrl)},[receipt]);
+ const shareToWhatsApp=async()=>{setShareNotice('');const result=await shareReceipt(receipt,pdf.file);if(result==='shared')setShareNotice('Receipt passed to your chosen app. Check the chat before sending.');else if(result==='unsupported'){const whatsappUrl=paymentWhatsAppUrl(receipt);downloadReceipt(receipt);if(whatsappUrl)window.open(whatsappUrl,'_blank','noopener,noreferrer');setShareNotice(whatsappUrl?'To attach the receipt, download the PDF, open WhatsApp confirmation, and attach it as a document before sending.':'Add a valid mobile number with country code to enable WhatsApp confirmation.')}else if(result==='failed')setShareNotice('Sharing could not start. Download the PDF and attach it in WhatsApp instead.')};
+ return <div className="modal-backdrop receipt-backdrop" onMouseDown={onClose}><div className="modal receipt-modal" role="dialog" aria-modal="true" aria-label={t('Receipt voucher')} onMouseDown={e=>e.stopPropagation()}><div className="modal-head"><div><h2>{t('Receipt voucher')}</h2><p>{receipt.number} · {receipt.tenant.name}</p></div><button className="icon-btn" aria-label={t('Close')} onClick={onClose}><X size={20}/></button></div><div className="receipt-toolbar"><button className="whatsapp-share" disabled={!pdf.file} onClick={shareToWhatsApp}><MessageCircle size={17}/>{t('Share receipt & message')}</button>{pdf.url&&<a className="secondary" href={pdf.url} target="_blank" rel="noopener noreferrer">{t('Open PDF')}</a>}<button className="primary" onClick={()=>downloadReceipt(receipt)}><Download size={16}/>{t('Download receipt')}</button></div>{shareNotice&&<p className="receipt-hint" role="status">{t(shareNotice)}</p>}{pdf.url&&<iframe className="receipt-preview" src={pdf.url} title={t('Receipt voucher')}/>}</div></div>;
 }
 
 function RecordPayment({tenant,legacy,onClose,onSave}) {
