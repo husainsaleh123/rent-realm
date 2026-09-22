@@ -400,8 +400,16 @@ function App({ authMode='login', onBack }) {
 
 function Root() {
  const [access,setAccess]=useState(null);
+ const [sessionChecking,setSessionChecking]=useState(supabaseConfigured);
  const [lang,setLang]=useState(()=>localStorage.getItem('rentora-lang')||'en');
  useEffect(()=>{localStorage.setItem('rentora-lang',lang);document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr'},[lang]);
+ useEffect(()=>{
+  if(!supabaseConfigured){setSessionChecking(false);return}
+  let active=true;
+  supabase.auth.getSession().then(({data:{session}})=>{if(active&&session)setAccess('login')}).finally(()=>{if(active)setSessionChecking(false)});
+  return()=>{active=false};
+ },[]);
+ if(sessionChecking)return <main className="portfolio-loading"><div className="brand"><span className="brand-mark"><Building2 size={20}/></span>Rent Realm</div></main>;
  if(!access)return <LandingPage lang={lang} setLang={setLang} onAccess={setAccess}/>;
  return <App authMode={access} onBack={()=>setAccess(null)}/>;
 }
