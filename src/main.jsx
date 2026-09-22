@@ -9,6 +9,7 @@ import {
   Plus, Search, Settings, TrendingUp, UserPlus, Users, Wallet, X, Check,
   AlertCircle, CalendarDays, Trash2, Pencil, Globe2, Camera, Moon, Sun,
   Eye, EyeOff, Mail, FileText, Download
+  , ArrowRight, BellRing, CheckCircle2, ShieldCheck, Sparkles
 } from 'lucide-react';
 import './styles.css';
 import { normalizeContactPhone, registrationMetadata } from './registration';
@@ -61,8 +62,8 @@ function Modal({ title, subtitle, onClose, children }) {
   </div>;
 }
 
-function Auth({ hasAccounts, onLogin, onRegister, lang, setLang }) {
-  const [mode, setMode] = useState(hasAccounts?'login':'register');
+function Auth({ hasAccounts, onLogin, onRegister, lang, setLang, initialMode='login', onBack }) {
+  const [mode, setMode] = useState(initialMode==='register'?'register':hasAccounts?'login':'register');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -97,6 +98,7 @@ function Auth({ hasAccounts, onLogin, onRegister, lang, setLang }) {
     <section className="auth-form-wrap">
       <form className="auth-form" onSubmit={submit}>
         <div className="mobile-brand brand"><span className="brand-mark"><Building2 size={20}/></span>Rent Realm</div>
+        {onBack&&<button type="button" className="auth-back" onClick={onBack}><ChevronLeft size={16}/>{t('Back to home')}</button>}
         <button type="button" className="lang-auth" onClick={()=>setLang(lang==='en'?'ar':'en')}><Globe2 size={16}/>{lang==='en'?'العربية':'English'}</button>
         {hasAccounts&&<div className="auth-mode-toggle" role="tablist" aria-label={t('Account access')}>
           <button type="button" role="tab" aria-selected={!setup} className={!setup?'active':''} onClick={()=>{setMode('login');setError('');setNotice('')}}>{t('Log in')}</button>
@@ -116,6 +118,52 @@ function Auth({ hasAccounts, onLogin, onRegister, lang, setLang }) {
         <small><KeyRound size={13}/> {t('Your password is securely managed by Supabase.')}</small>
       </form>
     </section>
+  </main>;
+}
+
+function LandingPage({ onAccess, lang, setLang }) {
+  const copy = lang==='ar' ? {
+    nav:['المزايا','كيف يعمل','لماذا رنت ريلم'], login:'تسجيل الدخول', start:'ابدأ الآن',
+    eyebrow:'ودّع مطاردة الإيجارات',
+    title:<>كل عقار. كل دفعة.<br/><em>في مكان واحد.</em></>,
+    body:'رنت ريلم يحوّل فوضى إدارة العقارات إلى نظام واضح — دفعات وعقود ومستأجرون وإيصالات، كلها تحت سيطرتك.',
+    cta:'أنشئ حسابك', secondary:'شاهد كيف يعمل', note:'ابدأ خلال دقائق • لا تحتاج بطاقة دفع',
+    trusted:'مصمم لأصحاب العقارات ومديريها',
+    benefits:[['اعرف من دفع — فوراً','تابع التحصيل والمتأخرات لكل شهر دون جداول مبعثرة.'],['احتفظ بكل شيء منظماً','العقارات والمستأجرون والعقود وسجل الدفعات في مكان واحد.'],['حوّل الدفعات إلى إثبات','سجّل الدفعة وأنشئ إيصال PDF جاهزاً للتنزيل والمشاركة.'],['ملف كامل لكل مستأجر','احتفظ ببيانات التواصل والوحدة وقيمة الإيجار وتاريخ السكن معاً.'],['لا تفوّت مبلغاً مستحقاً','شاهد الأرصدة المتبقية والدفعات الجزئية التي تحتاج إلى متابعة.'],['اعمل بلغتك وطريقتك','بدّل بين العربية والإنجليزية والوضع الفاتح والداكن بسهولة.']],
+    howTitle:'من عقار جديد إلى تحصيل واضح', howBody:'سير عمل بسيط يساعدك على إنجاز العمل الإداري بسرعة.',
+    steps:[['01','أضف عقاراتك','سجّل الوحدات والعناوين ونظّم محفظتك.'],['02','اربط المستأجرين','احفظ بيانات التواصل والإيجار والعقود.'],['03','تابع كل دفعة','سجّل التحصيل وشاهد المستحق وأصدر الإيصالات.']],
+    close:'عقارات أقل تعقيداً. وقت أكثر لك.', closeBody:'ابدأ بتنظيم محفظتك اليوم واجعل متابعة الإيجار مهمة بسيطة وواضحة.',
+    dashboard:'لوحة المحفظة', collected:'المحصّل هذا الشهر', outstanding:'المتبقي', tenants:'المستأجرون', ontrack:'معدل التحصيل', attention:'يحتاج للمتابعة', paid:'مدفوع', due:'مستحق'
+  } : {
+    nav:['Features','How it works','Why Rent Realm'], login:'Log in', start:'Get started',
+    eyebrow:'STOP CHASING RENT. START RUNNING IT.',
+    title:<>All your properties.<br/><em>In one place.</em></>,
+    body:'Rent Realm turns property-management chaos into one clear system—payments, contracts, tenants, and receipts, all under control.',
+    cta:'Create your account', secondary:'See how it works', note:'Set up in minutes • No payment card needed',
+    trusted:'Built for property owners and managers',
+    benefits:[['Know who paid—instantly','Track collected and outstanding rent month by month, without scattered spreadsheets.'],['Keep every detail organized','Properties, tenants, contracts, and payment history stay together in one reliable place.'],['Turn payments into proof','Record a payment and create a downloadable, shareable PDF receipt in moments.'],['Give every tenant one home','Keep contact details, units, rent, and move-in records in one complete profile.'],['Never lose sight of a balance','Spot outstanding amounts and partial payments that still need your attention.'],['Work your way','Switch between English and Arabic, light and dark mode, on any screen.']],
+    howTitle:'From new property to clear collection', howBody:'A simple workflow that gets the admin out of your way.',
+    steps:[['01','Add your properties','Record units and addresses, then organize your portfolio.'],['02','Connect your tenants','Keep contact details, rent amounts, and contracts close.'],['03','Track every payment','Record collections, see balances, and issue receipts.']],
+    close:'Less property admin. More time for you.', closeBody:'Start organizing your portfolio today and make rent follow-up feel refreshingly simple.',
+    dashboard:'Portfolio overview', collected:'Collected this month', outstanding:'Outstanding', tenants:'Active tenants', ontrack:'Collection rate', attention:'Needs attention', paid:'Paid', due:'Due'
+  };
+  useEffect(()=>{
+    const elements=[...document.querySelectorAll('.landing-page .reveal')];
+    const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('revealed');observer.unobserve(entry.target)}}),{threshold:.14});
+    elements.forEach(element=>observer.observe(element));
+    return()=>observer.disconnect();
+  },[lang]);
+  const scrollTo=id=>document.getElementById(id)?.scrollIntoView({behavior:'smooth'});
+  return <main className="landing-page">
+    <nav className="landing-nav"><button className="landing-logo" onClick={()=>scrollTo('top')}><span><Building2 size={21}/></span>Rent Realm</button><div className="landing-links"><button onClick={()=>scrollTo('features')}>{copy.nav[0]}</button><button onClick={()=>scrollTo('how')}>{copy.nav[1]}</button><button onClick={()=>scrollTo('why')}>{copy.nav[2]}</button></div><div className="landing-actions"><button className="landing-language" onClick={()=>setLang(lang==='en'?'ar':'en')}><Globe2 size={16}/>{lang==='en'?'العربية':'English'}</button><button className="landing-login" onClick={()=>onAccess('login')}>{copy.login}</button><button className="landing-primary small" onClick={()=>onAccess('register')}>{copy.start}<ArrowRight size={16}/></button></div></nav>
+    <section className="landing-hero" id="top"><div className="hero-copy"><span className="landing-eyebrow"><Sparkles size={15}/>{copy.eyebrow}</span><h1>{copy.title}</h1><p>{copy.body}</p><div className="hero-actions"><button className="landing-primary" onClick={()=>onAccess('register')}>{copy.cta}<ArrowRight size={18}/></button><button className="landing-secondary" onClick={()=>scrollTo('how')}>{copy.secondary}<ChevronDown size={18}/></button></div><small><CheckCircle2 size={15}/>{copy.note}</small></div>
+      <div className="product-stage" aria-label={copy.dashboard}><div className="stage-glow"/><div className="product-window"><div className="window-top"><div className="mini-logo"><Building2 size={16}/></div><span>{copy.dashboard}</span><div className="window-dots"><i/><i/><i/></div></div><div className="window-body"><div className="mock-sidebar"><b><Building2 size={15}/></b>{[Home,Building2,Users,Wallet].map((Icon,i)=><i className={i===0?'active':''} key={i}><Icon size={15}/></i>)}</div><div className="mock-content"><div className="mock-heading"><div><span>SEPTEMBER 2026</span><strong>{copy.dashboard}</strong></div><button>+ {copy.tenants}</button></div><div className="mock-stats"><article><span>{copy.collected}</span><b>BHD 4,850</b><small>12 {copy.paid}</small></article><article><span>{copy.outstanding}</span><b>BHD 650</b><small>2 {copy.due}</small></article><article><span>{copy.tenants}</span><b>14</b><small>4 properties</small></article></div><div className="mock-lower"><div className="mock-chart"><span>{copy.ontrack}</span><div className="chart-row"><div className="mock-donut"><b>88%</b></div><div className="chart-bars"><i/><i/><i/><i/><i/><i/></div></div></div><div className="mock-list"><span>{copy.attention}</span><div><i>AK</i><p><b>Ahmed K.</b><small>Seef · 4A</small></p><strong>BHD 350</strong></div><div><i>LM</i><p><b>Layla M.</b><small>Amwaj · 2C</small></p><strong>BHD 300</strong></div></div></div></div></div></div><div className="floating-proof proof-one"><CheckCircle2 size={18}/><span><b>{copy.paid}</b>Receipt ready</span></div><div className="floating-proof proof-two"><BellRing size={18}/><span><b>{copy.attention}</b>2 payments</span></div></div>
+    </section>
+    <div className="trust-strip"><ShieldCheck size={18}/><span>{copy.trusted}</span><i/><span>Clear monthly tracking</span><i/><span>Secure account access</span></div>
+    <section className="landing-section benefits reveal" id="features"><div className="section-kicker">WHY RENT REALM</div><h2>{copy.howTitle}</h2><p className="section-lead">{copy.howBody}</p><div className="benefit-grid">{copy.benefits.map(([title,body],i)=>{const Icon=[TrendingUp,FileText,CheckCircle2,Users,BellRing,Globe2][i];return <article style={{'--delay':`${i*70}ms`}} key={title}><span><Icon size={23}/></span><h3>{title}</h3><p>{body}</p></article>})}</div></section>
+    <section className="how-section reveal" id="how"><div className="how-copy"><span className="section-kicker">HOW IT WORKS</span><h2>{copy.howTitle}</h2><p>{copy.howBody}</p><button className="landing-primary" onClick={()=>onAccess('register')}>{copy.cta}<ArrowRight size={18}/></button></div><div className="steps">{copy.steps.map(([number,title,body],i)=><article style={{'--delay':`${i*110}ms`}} key={number}><span>{number}</span><div><h3>{title}</h3><p>{body}</p></div></article>)}</div></section>
+    <section className="closing-cta reveal" id="why"><div><span className="section-kicker">READY WHEN YOU ARE</span><h2>{copy.close}</h2><p>{copy.closeBody}</p></div><button className="landing-primary light" onClick={()=>onAccess('register')}>{copy.cta}<ArrowRight size={18}/></button></section>
+    <footer className="landing-footer"><div className="landing-logo"><span><Building2 size={19}/></span>Rent Realm</div><p>© {new Date().getFullYear()} Rent Realm</p><button onClick={()=>onAccess('login')}>{copy.login}</button></footer>
   </main>;
 }
 
@@ -230,7 +278,7 @@ function RecordPayment({tenant,legacy,onClose,onSave}) {
 
 function AddProperty({ onClose,onSave,initial,lang }) { const [f,setF]=useState(initial||{name:'',address:'',units:'',image:''}); const t=s=>tx(lang,s); return <Modal title={t(initial?'Edit property':'Add a property')} subtitle={t(initial?'Update the property information below.':'Create a new property in your portfolio.')} onClose={onClose}><form className="modal-form" onSubmit={e=>{e.preventDefault();onSave({...f,units:Number(f.units)})}}><ImageField property value={f.image} onChange={image=>setF({...f,image})} lang={lang}/><label>{t('Property name')}<input required autoFocus value={f.name} onChange={e=>setF({...f,name:e.target.value})} placeholder="e.g. Bay View Residence"/></label><label>{t('Location or address')}<input required value={f.address} onChange={e=>setF({...f,address:e.target.value})} placeholder="e.g. Amwaj Islands"/></label><label>{t('Number of units')}<input required min="1" type="number" value={f.units} onChange={e=>setF({...f,units:e.target.value})} placeholder="10"/></label><div className="modal-actions"><button type="button" className="secondary" onClick={onClose}>{t('Cancel')}</button><button className="primary">{initial?<Pencil size={17}/>:<Building2 size={17}/>} {t(initial?'Save changes':'Add property')}</button></div></form></Modal> }
 
-function App() {
+function App({ authMode='login', onBack }) {
  if(!supabaseConfigured)return <AuthConfigurationError/>;
  const [session,setSession]=useState(null);
  const [authLoading,setAuthLoading]=useState(true);
@@ -295,10 +343,18 @@ function App() {
 };
  const login=async({email,password})=>{const {error}=await supabase.auth.signInWithPassword({email,password});if(error)return {error:error.message==='Email not confirmed'?'Please confirm your email before logging in.':'Email or password is incorrect.'};return {}};
  if(authLoading)return null;
- if(!session) return <Auth lang={lang} setLang={setLang} hasAccounts onRegister={register} onLogin={login}/>;
+ if(!session) return <Auth lang={lang} setLang={setLang} hasAccounts initialMode={authMode} onBack={onBack} onRegister={register} onLogin={login}/>;
  const currentUser={username:session.user.user_metadata?.full_name||session.user.user_metadata?.username||'Property Manager',email:session.user.email,phone:session.user.user_metadata?.phone||'',role:session.user.user_metadata?.role||'property_owner'};
  const add=()=>setModal(page==='properties'?'property':'tenant');
  return <div className="app"><Sidebar page={page} setPage={setPage} open={menu} setOpen={setMenu} lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} user={currentUser} onSettings={()=>setModal({type:'account'})} onLogout={()=>supabase.auth.signOut()}/><main className="main"><Header page={page} setMenu={setMenu} onAdd={add} lang={lang} username={currentUser.username}/><div className="content">{page==='dashboard'&&<Dashboard lang={lang} data={data} month={month} setMonth={setMonth} setPage={setPage} togglePaid={togglePaid}/>} {page==='properties'&&<Properties data={data} onEdit={p=>setModal({type:'property',item:p})} onDelete={id=>{if(confirm(tx(lang,'Delete this property and all of its tenants?')))setData(d=>({...d,properties:d.properties.filter(p=>p.id!==id),tenants:d.tenants.filter(t=>t.propertyId!==id)}))}}/>} {page==='tenants'&&<Tenants data={data} month={month} togglePaid={togglePaid} onViewContract={viewContract} onEdit={tenant=>setModal({type:'tenant',item:tenant})} onDelete={id=>{if(confirm(tx(lang,'Remove this tenant?')))setData(d=>({...d,tenants:d.tenants.filter(tenant=>tenant.id!==id)}))}}/>} {page==='payments'&&<Payments data={data} month={month} setMonth={setMonth} togglePaid={togglePaid} onReceipt={onReceipt}/>}</div></main>{modal?.type==='account'&&<AccountSettings user={currentUser} onClose={()=>setModal(null)} onChangePassword={async password=>{const {data:updated,error}=await supabase.auth.updateUser({password});if(error)return error.message;setSession(previous=>({...previous,user:updated.user}))}} onSave={async fields=>{const {data:updated,error}=await supabase.auth.updateUser({data:{full_name:fields.name,username:fields.name,phone:fields.phone}});if(error)return error.message;setSession(previous=>({...previous,user:updated.user}));setModal(null)}}/>} {modal?.type==='receipt'&&<ReceiptPreview receipt={modal.receipt} onClose={()=>setModal(null)}/>} {modal?.type==='payment'&&<RecordPayment key={modal.tenant.id+modal.month} tenant={modal.tenant} legacy={modal.legacy} onClose={()=>setModal(null)} onSave={savePayment}/>} {(modal==='tenant'||modal?.type==='tenant')&&<AddTenant lang={lang} properties={data.properties} initial={modal?.item} onClose={()=>setModal(null)} onSave={saveTenant}/>} {(modal==='property'||modal?.type==='property')&&<AddProperty lang={lang} initial={modal?.item} onClose={()=>setModal(null)} onSave={saveProperty}/>}</div>;
 }
 
-createRoot(document.getElementById('root')).render(<App/>);
+function Root() {
+ const [access,setAccess]=useState(null);
+ const [lang,setLang]=useState(()=>localStorage.getItem('rentora-lang')||'en');
+ useEffect(()=>{localStorage.setItem('rentora-lang',lang);document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr'},[lang]);
+ if(!access)return <LandingPage lang={lang} setLang={setLang} onAccess={setAccess}/>;
+ return <App authMode={access} onBack={()=>setAccess(null)}/>;
+}
+
+createRoot(document.getElementById('root')).render(<Root/>);
