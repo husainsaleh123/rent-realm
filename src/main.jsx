@@ -47,6 +47,7 @@ function ImageField({ value, onChange, property=false, lang='en' }) {
 }
 function PersonAvatar({ tenant }) { return <img className="avatar avatar-photo" src={tenant.image||'/images/default-tenant.webp'} alt=""/> }
 const emptyData = () => ({ properties: [], tenants: [], payments: {} });
+const hasPortfolioData = data => Boolean(data?.properties?.length || data?.tenants?.length || Object.keys(data?.payments || {}).length);
 
 const activeLocale = () => activeLanguage==='ar'?'ar-BH-u-nu-latn':'en-US';
 const money = (n) => new Intl.NumberFormat(activeLocale(), { style: 'currency', currency: 'BHD', minimumFractionDigits: 0 }).format(n);
@@ -305,6 +306,9 @@ function App({ authMode='login', onBack }) {
  const [session,setSession]=useState(null);
  const [authLoading,setAuthLoading]=useState(true);
  const [data,setData]=useState(emptyData);
+ const [portfolioLoading,setPortfolioLoading]=useState(true);
+ const [loadedUserId,setLoadedUserId]=useState('');
+ const [syncError,setSyncError]=useState('');
  const [lang,setLang]=useState(()=>localStorage.getItem('rentora-lang')||'en');
  const [theme,setTheme]=useState(()=>localStorage.getItem('rentora-theme')||'light');
  activeLanguage=lang;
@@ -316,13 +320,35 @@ function App({ authMode='login', onBack }) {
   return ()=>subscription.unsubscribe();
  },[]);
  useEffect(()=>{
-  if(!session?.user?.id)return;
-  const userStorageKey=`${STORAGE_KEY}:${session.user.id}`;
-  try{setData(JSON.parse(localStorage.getItem(userStorageKey))||emptyData())}catch{setData(emptyData())}
+  if(!session?.user?.id){setPortfolioLoading(true);setLoadedUserId('');return}
+  let active=true;
+  const userId=session.user.id;const userStorageKey=`${STORAGE_KEY}:${userId}`;
+  const loadPortfolio=async()=>{
+   setPortfolioLoading(true);setLoadedUserId('');setSyncError('');
+   let localData=emptyData();
+   try{localData=JSON.parse(localStorage.getItem(userStorageKey))||emptyData()}catch{}
+   const {data:remote,error}=await supabase.from('portfolios').select('data').eq('user_id',userId).maybeSingle();
+   if(!active)return;
+   if(error){setData(localData);setSyncError('Portfolio sync is unavailable. Apply the Supabase portfolio migration, then reload.');setLoadedUserId(userId);setPortfolioLoading(false);return}
+   if(remote?.data && (hasPortfolioData(remote.data)||!hasPortfolioData(localData))){setData(remote.data);localStorage.setItem(userStorageKey,JSON.stringify(remote.data))}
+   else {
+    setData(localData);
+    const {error:saveError}=await supabase.from('portfolios').upsert({user_id:userId,data:localData,updated_at:new Date().toISOString()});
+    if(saveError)setSyncError('Your portfolio could not be saved to the database. Please reload and try again.');
+   }
+   if(active){setLoadedUserId(userId);setPortfolioLoading(false)}
+  };
+  loadPortfolio();
+  return()=>{active=false};
  },[session?.user?.id]);
  useEffect(()=>{
-  if(session?.user?.id)localStorage.setItem(`${STORAGE_KEY}:${session.user.id}`,JSON.stringify(data));
- },[data,session?.user?.id]);
+  if(!session?.user?.id||portfolioLoading||loadedUserId!==session.user.id)return;
+  const userId=session.user.id;const userStorageKey=`${STORAGE_KEY}:${userId}`;
+  localStorage.setItem(userStorageKey,JSON.stringify(data));
+  let active=true;
+  supabase.from('portfolios').upsert({user_id:userId,data,updated_at:new Date().toISOString()}).then(({error})=>{if(active)setSyncError(error?'Your latest changes could not be saved. Check your connection and try again.':'')});
+  return()=>{active=false};
+ },[data,session?.user?.id,portfolioLoading,loadedUserId]);
  useEffect(()=>{localStorage.setItem('rentora-lang',lang);document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr'},[lang]);
  useEffect(()=>{localStorage.setItem('rentora-theme',theme);document.documentElement.dataset.theme=theme},[theme]);
  const togglePaid=(id,paymentMonth=month)=>{
@@ -366,9 +392,10 @@ function App({ authMode='login', onBack }) {
  const login=async({email,password})=>{const {error}=await supabase.auth.signInWithPassword({email,password});if(error)return {error:error.message==='Email not confirmed'?'Please confirm your email before logging in.':'Email or password is incorrect.'};return {}};
  if(authLoading)return null;
  if(!session) return <Auth lang={lang} setLang={setLang} hasAccounts initialMode={authMode} onBack={onBack} onRegister={register} onLogin={login}/>;
+ if(portfolioLoading||loadedUserId!==session.user.id)return <main className="portfolio-loading"><div className="brand"><span className="brand-mark"><Building2 size={20}/></span>Rent Realm</div><p>{t('Loading your portfolio…')}</p></main>;
  const currentUser={username:session.user.user_metadata?.full_name||session.user.user_metadata?.username||'Property Manager',email:session.user.email,phone:session.user.user_metadata?.phone||'',role:session.user.user_metadata?.role||'property_owner'};
  const add=()=>setModal(page==='properties'?'property':'tenant');
- return <div className="app"><Sidebar page={page} setPage={setPage} open={menu} setOpen={setMenu} lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} user={currentUser} onSettings={()=>setModal({type:'account'})} onLogout={()=>supabase.auth.signOut()}/><main className="main"><Header page={page} setMenu={setMenu} onAdd={add} lang={lang} username={currentUser.username}/><div className="content">{page==='dashboard'&&<Dashboard lang={lang} data={data} month={month} setMonth={setMonth} setPage={setPage} togglePaid={togglePaid}/>} {page==='properties'&&<Properties data={data} onEdit={p=>setModal({type:'property',item:p})} onDelete={id=>{if(confirm(tx(lang,'Delete this property and all of its tenants?')))setData(d=>({...d,properties:d.properties.filter(p=>p.id!==id),tenants:d.tenants.filter(t=>t.propertyId!==id)}))}}/>} {page==='tenants'&&<Tenants data={data} month={month} togglePaid={togglePaid} onViewContract={viewContract} onEdit={tenant=>setModal({type:'tenant',item:tenant})} onDelete={id=>{if(confirm(tx(lang,'Remove this tenant?')))setData(d=>({...d,tenants:d.tenants.filter(tenant=>tenant.id!==id)}))}}/>} {page==='payments'&&<Payments data={data} month={month} setMonth={setMonth} togglePaid={togglePaid} onReceipt={onReceipt}/>}</div></main>{modal?.type==='account'&&<AccountSettings user={currentUser} onClose={()=>setModal(null)} onChangePassword={async password=>{const {data:updated,error}=await supabase.auth.updateUser({password});if(error)return error.message;setSession(previous=>({...previous,user:updated.user}))}} onSave={async fields=>{const {data:updated,error}=await supabase.auth.updateUser({data:{full_name:fields.name,username:fields.name,phone:fields.phone}});if(error)return error.message;setSession(previous=>({...previous,user:updated.user}));setModal(null)}}/>} {modal?.type==='receipt'&&<ReceiptPreview receipt={modal.receipt} onClose={()=>setModal(null)}/>} {modal?.type==='payment'&&<RecordPayment key={modal.tenant.id+modal.month} tenant={modal.tenant} legacy={modal.legacy} onClose={()=>setModal(null)} onSave={savePayment}/>} {(modal==='tenant'||modal?.type==='tenant')&&<AddTenant lang={lang} properties={data.properties} initial={modal?.item} onClose={()=>setModal(null)} onSave={saveTenant}/>} {(modal==='property'||modal?.type==='property')&&<AddProperty lang={lang} initial={modal?.item} onClose={()=>setModal(null)} onSave={saveProperty}/>}</div>;
+ return <div className="app"><Sidebar page={page} setPage={setPage} open={menu} setOpen={setMenu} lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} user={currentUser} onSettings={()=>setModal({type:'account'})} onLogout={()=>supabase.auth.signOut()}/><main className="main"><Header page={page} setMenu={setMenu} onAdd={add} lang={lang} username={currentUser.username}/>{syncError&&<div className="sync-error" role="alert"><AlertCircle size={17}/>{t(syncError)}</div>}<div className="content">{page==='dashboard'&&<Dashboard lang={lang} data={data} month={month} setMonth={setMonth} setPage={setPage} togglePaid={togglePaid}/>} {page==='properties'&&<Properties data={data} onEdit={p=>setModal({type:'property',item:p})} onDelete={id=>{if(confirm(tx(lang,'Delete this property and all of its tenants?')))setData(d=>({...d,properties:d.properties.filter(p=>p.id!==id),tenants:d.tenants.filter(t=>t.propertyId!==id)}))}}/>} {page==='tenants'&&<Tenants data={data} month={month} togglePaid={togglePaid} onViewContract={viewContract} onEdit={tenant=>setModal({type:'tenant',item:tenant})} onDelete={id=>{if(confirm(tx(lang,'Remove this tenant?')))setData(d=>({...d,tenants:d.tenants.filter(tenant=>tenant.id!==id)}))}}/>} {page==='payments'&&<Payments data={data} month={month} setMonth={setMonth} togglePaid={togglePaid} onReceipt={onReceipt}/>}</div></main>{modal?.type==='account'&&<AccountSettings user={currentUser} onClose={()=>setModal(null)} onChangePassword={async password=>{const {data:updated,error}=await supabase.auth.updateUser({password});if(error)return error.message;setSession(previous=>({...previous,user:updated.user}))}} onSave={async fields=>{const {data:updated,error}=await supabase.auth.updateUser({data:{full_name:fields.name,username:fields.name,phone:fields.phone}});if(error)return error.message;setSession(previous=>({...previous,user:updated.user}));setModal(null)}}/>} {modal?.type==='receipt'&&<ReceiptPreview receipt={modal.receipt} onClose={()=>setModal(null)}/>} {modal?.type==='payment'&&<RecordPayment key={modal.tenant.id+modal.month} tenant={modal.tenant} legacy={modal.legacy} onClose={()=>setModal(null)} onSave={savePayment}/>} {(modal==='tenant'||modal?.type==='tenant')&&<AddTenant lang={lang} properties={data.properties} initial={modal?.item} onClose={()=>setModal(null)} onSave={saveTenant}/>} {(modal==='property'||modal?.type==='property')&&<AddProperty lang={lang} initial={modal?.item} onClose={()=>setModal(null)} onSave={saveProperty}/>}</div>;
 }
 
 function Root() {
