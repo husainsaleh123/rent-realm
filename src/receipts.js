@@ -5,9 +5,9 @@ export const localDate = () => {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 };
-export function createReceipt({ tenant, property, month, date, method, amount, rentDue, previouslyPaid = 0, balance = 0, issuer }) {
+export function createReceipt({ tenant, property, month, date, method, amount, rentDue, previouslyPaid = 0, balance = 0, issuer, branding = {} }) {
   const id = crypto.randomUUID();
-  return { id, number: `RCPT/${date.slice(2,4)}/${id.slice(0,8).toUpperCase()}`, invoice: `INV/${month.replace('-','')}/${tenant.id.slice(0,8).toUpperCase()}`, month, date, method, amount: Number(amount), rentDue: Number(rentDue ?? tenant.rent), previouslyPaid: Number(previouslyPaid), balance: Number(balance), tenant: { name: tenant.name, phone: tenant.phone || '', email: tenant.email || '', unit: tenant.unit }, property: property?.name || '', propertyAddress: property?.address || '', issuer: { ...issuer } };
+  return { id, number: `RCPT/${date.slice(2,4)}/${id.slice(0,8).toUpperCase()}`, invoice: `INV/${month.replace('-','')}/${tenant.id.slice(0,8).toUpperCase()}`, month, date, method, amount: Number(amount), rentDue: Number(rentDue ?? tenant.rent), previouslyPaid: Number(previouslyPaid), balance: Number(balance), tenant: { name: tenant.name, phone: tenant.phone || '', email: tenant.email || '', unit: tenant.unit }, property: property?.name || '', propertyAddress: property?.address || '', issuer: { ...issuer }, branding: { firmName: branding.firmName || '', logo: branding.logo || '' } };
 }
 export function receiptDocument(receipt) {
   const doc = new jsPDF();
@@ -17,20 +17,30 @@ export function receiptDocument(receipt) {
   const date = receipt.date.split('-').reverse().join('/');
   const reference = new Date(`${receipt.month}-02T12:00:00`).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
   const ink = [35,44,56], gold = [174,161,135], purple = [143,96,137];
-  doc.setFillColor(249,248,246); doc.rect(0,0,210,49,'F');
+  doc.setFillColor(249,248,246); doc.rect(0,0,210,55,'F');
+  const branding = receipt.branding || {};
+  const firmName = branding.firmName || receipt.issuer.username || 'Rent Realm';
+  let brandTextX = 14;
+  if (branding.logo) {
+    try {
+      const format = branding.logo.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(branding.logo,format,14,9,24,24,undefined,'FAST');
+      brandTextX = 44;
+    } catch { brandTextX = 14; }
+  }
   doc.setTextColor(...ink); doc.setFont('helvetica','bold'); doc.setFontSize(17);
-  doc.text(doc.splitTextToSize(receipt.issuer.username || 'Rent Realm',88),14,20);
+  doc.text(doc.splitTextToSize(firmName,76),brandTextX,20);
   doc.setFont('helvetica','bold'); doc.setFontSize(10);
   const buildingName = doc.splitTextToSize(receipt.property || '',88);
-  doc.text(buildingName,14,31);
+  doc.text(buildingName,14,40);
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
-  doc.text(doc.splitTextToSize(receipt.propertyAddress || '',88),14,31 + buildingName.length * 4);
+  doc.text(doc.splitTextToSize(receipt.propertyAddress || '',88),14,40 + buildingName.length * 4);
   doc.text(doc.splitTextToSize(receipt.issuer.email || '',82),196,18,{align:'right'});
-  doc.setTextColor(...gold); doc.setFontSize(23); doc.text('Receipt Voucher',196,44,{align:'right'});
-  doc.setTextColor(...ink); doc.setFontSize(11); doc.text('Tenant',14,61);
+  doc.setTextColor(...gold); doc.setFontSize(23); doc.text('Receipt Voucher',196,49,{align:'right'});
+  doc.setTextColor(...ink); doc.setFontSize(11); doc.text('Tenant',14,67);
   const contact = [receipt.tenant.name,receipt.tenant.phone ? `Mobile: ${receipt.tenant.phone}` : '',receipt.tenant.email ? `Email: ${receipt.tenant.email}` : ''].filter(Boolean);
-  doc.text(contact.flatMap(line=>doc.splitTextToSize(line,180)),14,68);
-  const start = Math.max(98, 72 + contact.length*7);
+  doc.text(contact.flatMap(line=>doc.splitTextToSize(line,180)),14,74);
+  const start = Math.max(104, 78 + contact.length*7);
   doc.setFont('helvetica','bold'); doc.setTextColor(...purple); doc.text(`Receipt No.: ${receipt.number}`,14,start); doc.text(amount,196,start,{align:'right'});
   autoTable(doc,{startY:start+8,theme:'striped',body:[[`Payment Date: ${date}`,''],[`Property: ${receipt.property} · ${receipt.tenant.unit}`,''],[`Amount Paid: ${amount}`,`Payment Method: ${receipt.method}`],[`Memo: ${receipt.invoice}`,'']],styles:{fontSize:10,textColor:ink,cellPadding:3},alternateRowStyles:{fillColor:[243,244,246]},columnStyles:{0:{cellWidth:105}},margin:{left:14,right:14}});
   const ledgerRows=[[ `01/${receipt.month.slice(5)}/${receipt.month.slice(0,4)}`,receipt.invoice,reference,rentDue]];
