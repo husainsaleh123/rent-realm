@@ -101,8 +101,8 @@ function Modal({ title, subtitle, onClose, children }) {
   </div>;
 }
 
-function Auth({ hasAccounts, onLogin, onRegister, lang, setLang, initialMode='login', onBack }) {
-  const [mode, setMode] = useState(initialMode==='register'?'register':hasAccounts?'login':'register');
+function Auth({ hasAccounts, onLogin, onRegister, lang, setLang, initialMode='login', onBack, onPasswordUpdated }) {
+  const [mode, setMode] = useState(['register','forgot','recover'].includes(initialMode)?initialMode:hasAccounts?'login':'register');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -113,16 +113,36 @@ function Auth({ hasAccounts, onLogin, onRegister, lang, setLang, initialMode='lo
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const setup = mode==='register';
+  const forgot = mode==='forgot';
+  const recovering = mode==='recover';
+  const changeMode = next => {setMode(next);setError('');setNotice('');setValue('');setConfirm('')};
   async function submit(e) {
-    e.preventDefault(); setError(''); setNotice('');
+    e.preventDefault();
+    if(submitting || mode==='complete')return;
+    setError(''); setNotice('');
     const normalizedEmail=email.trim().toLowerCase();
     if(setup && displayName.trim().length<2)return setError('Display name must be at least 2 characters.');
-    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail))return setError('Enter a valid email address.');
+    if(!recovering && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail))return setError('Enter a valid email address.');
     if(setup && !normalizeContactPhone(phone))return setError('Enter a valid phone number with country code.');
-    if (value.length < 6) return setError('Password must be at least 6 characters.');
-    if (setup && value !== confirm) return setError('Passwords do not match.');
+    if (!forgot && value.length < 6) return setError('Password must be at least 6 characters.');
+    if ((setup || recovering) && value !== confirm) return setError('Passwords do not match.');
     setSubmitting(true);
     try {
+      if(forgot){
+        const redirectTo = new URL(window.location.pathname, window.location.origin);
+        redirectTo.searchParams.set('reset-password','1');
+        const {error} = await supabase.auth.resetPasswordForEmail(normalizedEmail,{redirectTo:redirectTo.href});
+        if(error) return setError('Could not send the reset email. Please wait a moment and try again.');
+        setNotice('If an account exists with this email, you will receive a password reset link.');
+        return;
+      }
+      if(recovering){
+        const {error} = await supabase.auth.updateUser({password:value});
+        if(error) return setError(error.message);
+        setValue('');setConfirm('');setNotice('Your password has been updated.');
+        setMode('complete');
+        return;
+      }
       const result=setup?await onRegister({displayName:displayName.trim(),phone:normalizeContactPhone(phone),email:normalizedEmail,password:value}):await onLogin({email:normalizedEmail,password:value});
       if(result?.error)setError(result.error);
       if(result?.message){setNotice(result.message);setMode('login');setValue('');setConfirm('')}
@@ -139,21 +159,22 @@ function Auth({ hasAccounts, onLogin, onRegister, lang, setLang, initialMode='lo
         <div className="mobile-brand brand"><span className="brand-mark"><Building2 size={20}/></span>Rent Realm</div>
         {onBack&&<button type="button" className="auth-back" onClick={onBack}><ChevronLeft size={16}/>{t('Back to home')}</button>}
         <LanguageSelect lang={lang} setLang={setLang} className="lang-auth"/>
-        {hasAccounts&&<div className="auth-mode-toggle" role="tablist" aria-label={t('Account access')}>
-          <button type="button" role="tab" aria-selected={!setup} className={!setup?'active':''} onClick={()=>{setMode('login');setError('');setNotice('')}}>{t('Log in')}</button>
-          <button type="button" role="tab" aria-selected={setup} className={setup?'active':''} onClick={()=>{setMode('register');setError('');setNotice('')}}>{t('Create account')}</button>
+        {hasAccounts&&!recovering&&mode!=='complete'&&<div className="auth-mode-toggle" role="tablist" aria-label={t('Account access')}>
+          <button type="button" role="tab" aria-selected={!setup} className={!setup?'active':''} disabled={submitting} onClick={()=>changeMode('login')}>{t('Log in')}</button>
+          <button type="button" role="tab" aria-selected={setup} className={setup?'active':''} disabled={submitting} onClick={()=>changeMode('register')}>{t('Create account')}</button>
         </div>}
         <span className="eyebrow">{t('SECURE ACCESS')}</span>
-        <h2>{t(setup ? 'Create your account' : 'Welcome back')}</h2>
-        <p>{t(setup ? 'Sign up with your display name, email, phone number, and password.' : 'Use your email and password to access your portfolio.')}</p>
+        <h2>{t(mode==='complete'?'Password updated':recovering?'Set a new password':forgot?'Reset your password':setup ? 'Create your account' : 'Welcome back')}</h2>
+        <p>{t(mode==='complete'?'Your account and portfolio are ready to use.':recovering?'Choose a new password for your existing account.':forgot?'Enter your account email to receive a password reset link.':setup ? 'Sign up with your display name, email, phone number, and password.' : 'Use your email and password to access your portfolio.')}</p>
         {setup&&<label>{t('Display name')}<input required minLength="2" autoFocus type="text" autoComplete="name" value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder={t('Display name')}/></label>}
-        <label>{t('Email address')}<input required autoFocus={!setup} type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@example.com"/><Mail size={18}/></label>
+        {!recovering&&mode!=='complete'&&<label>{t('Email address')}<input required autoFocus={!setup} type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@example.com"/><Mail size={18}/></label>}
         {setup&&<label>{t('Mobile number')}<input required type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+973 0000 0000"/></label>}
-        <label>{t('Password')}<input required minLength="6" type={showPassword?'text':'password'} autoComplete={setup?'new-password':'current-password'} value={value} onChange={e=>setValue(e.target.value)} placeholder={t('Enter your password')}/><button className="password-toggle" type="button" title={t(showPassword?'Hide password':'Show password')} onClick={()=>setShowPassword(!showPassword)}>{showPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button></label>
-        {setup && <label>{t('Confirm password')}<input required minLength="6" type={showPassword?'text':'password'} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder={t('Repeat your password')}/><KeyRound size={18}/></label>}
-        {error && <div className="form-error"><AlertCircle size={16}/>{t(error)}</div>}
-        {notice && <div className="form-success"><Check size={16}/>{t(notice)}</div>}
-        <button className="primary wide" type="submit" disabled={submitting}>{t(submitting?'Please wait...':setup ? 'Create account' : 'Log in')} <ChevronRight size={18}/></button>
+        {!forgot&&mode!=='complete'&&<label>{t(recovering?'New password':'Password')}<input required minLength="6" type={showPassword?'text':'password'} autoComplete={setup||recovering?'new-password':'current-password'} value={value} onChange={e=>setValue(e.target.value)} placeholder={t('Enter your password')}/><button className="password-toggle" type="button" title={t(showPassword?'Hide password':'Show password')} onClick={()=>setShowPassword(!showPassword)}>{showPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button></label>}
+        {(setup||recovering) && <label>{t('Confirm password')}<input required minLength="6" type={showPassword?'text':'password'} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder={t('Repeat your password')}/><KeyRound size={18}/></label>}
+        {mode==='login'&&<button type="button" className="auth-back" disabled={submitting} onClick={()=>changeMode('forgot')}>{t('Forgot password?')}</button>}
+        {error && <div role="alert" className="form-error"><AlertCircle size={16}/>{t(error)}</div>}
+        {notice && <div role="status" className="form-success"><Check size={16}/>{t(notice)}</div>}
+        {mode==='complete'?<button className="primary wide" type="button" onClick={onPasswordUpdated}>{t('Continue to portfolio')} <ChevronRight size={18}/></button>:<button className="primary wide" type="submit" disabled={submitting}>{t(submitting?'Please wait...':recovering?'Save new password':forgot?'Send reset link':setup ? 'Create account' : 'Log in')} <ChevronRight size={18}/></button>}
         <small><KeyRound size={13}/> {t('Your password is securely managed by Supabase.')}</small>
       </form>
     </section>
@@ -343,7 +364,8 @@ function AddMaintenance({data,initial,onClose,onSave,lang}) {
  return <Modal title={translate(initial?"Edit maintenance request":"Add maintenance request")} subtitle={translate("Track the issue from report to completion.")} onClose={onClose}><form className="modal-form maintenance-form" onSubmit={event=>{event.preventDefault();onSave({...form,estimatedCost:Number(form.estimatedCost||0),actualCost:Number(form.actualCost||0)})}}><div className="form-row"><label>{translate("Property")}<select required value={form.propertyId} onChange={event=>selectProperty(event.target.value)}>{data.properties.map(property=><option key={property.id} value={property.id}>{property.name}</option>)}</select></label><label>{translate("Unit")}<SearchableFlatSelect key={form.propertyId} options={flatOptions} value={form.unit} onChange={unit=>set("unit",unit)} placeholder={translate("Search flats")}/></label></div><label>{translate("Tenant (optional)")}<select value={form.tenantId||""} onChange={event=>selectTenant(event.target.value)}><option value="">{translate("No tenant")}</option>{data.tenants.map(tenant=><option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label><label>{translate("Problem")}<textarea required rows="3" value={form.problem} onChange={event=>set("problem",event.target.value)} placeholder={translate("Describe what needs to be repaired")}/></label><label className="maintenance-photos">{translate("Photos (optional)")}<span className="contract-upload"><Camera size={17}/>{translate("Add photos")}<input type="file" accept="image/*" multiple onChange={event=>addPhotos(event.target.files)}/></span>{form.photos?.length>0&&<span className="maintenance-photo-grid">{form.photos.map((photo,index)=><span key={index}><img src={photo} alt=""/><button type="button" onClick={()=>set("photos",form.photos.filter((_,photoIndex)=>photoIndex!==index))}><X size={13}/></button></span>)}</span>}<small>{translate("Up to 5 photos")}</small></label><div className="form-row"><label>{translate("Date reported")}<input required type="date" value={form.dateReported} onChange={event=>set("dateReported",event.target.value)}/></label><label>{translate("Status")}<select value={form.status} onChange={event=>set("status",event.target.value)}>{maintenanceStatuses.map(status=><option key={status} value={status}>{translate(status)}</option>)}</select></label></div><label>{translate("Contractor (optional)")}<input value={form.contractor||""} onChange={event=>set("contractor",event.target.value)} placeholder={translate("Name or company")}/></label><div className="form-row"><label>{translate("Estimated cost (BHD)")}<input min="0" step="0.001" type="number" value={form.estimatedCost} onChange={event=>set("estimatedCost",event.target.value)}/></label><label>{translate("Actual cost (BHD)")}<input min="0" step="0.001" type="number" value={form.actualCost} onChange={event=>set("actualCost",event.target.value)}/></label></div><label>{translate("Notes (optional)")}<textarea rows="3" value={form.notes||""} onChange={event=>set("notes",event.target.value)}/></label><div className="modal-actions"><button type="button" className="secondary" onClick={onClose}>{translate("Cancel")}</button><button className="primary"><Wrench size={17}/>{translate(initial?"Save changes":"Add request")}</button></div></form></Modal>;
 }
 
-function Payments({ data, month, setMonth, togglePaid, onReceipt }) {
+function Payments({ data, togglePaid, onReceipt }) {
+ const [month,setMonth]=useState(()=>monthKey(new Date()));
  const [query,setQuery]=useState('');const [sort,setSort]=useState('month');const [direction,setDirection]=useState('asc');const [allMonths,setAllMonths]=useState(false);
  const rows=paymentRows(data,month,{query,sort,direction,allMonths});const total=rows.reduce((sum,{tenant})=>sum+Number(tenant.rent),0);const received=rows.reduce((sum,{tenant,payment})=>sum+Math.min(Number(tenant.rent),amountCollected(payment)),0);const label=allMonths?t('All recorded months'):monthLabel(month);
  const downloadReport=()=>{const doc=new jsPDF();doc.setTextColor(31,91,68);doc.setFontSize(20);doc.text('Rent Realm Payment Summary',14,18);doc.setTextColor(60,70,64);doc.setFontSize(11);doc.text(allMonths?'All recorded months':monthLabel(month),14,26);doc.setFontSize(10);doc.text(`Expected: BHD ${total.toFixed(3)}   Collected: BHD ${received.toFixed(3)}   Outstanding: BHD ${(total-received).toFixed(3)}`,14,35);autoTable(doc,{startY:43,head:[['Month','Tenant','Property / Unit','Rent Due','Collected','Outstanding','Status']],body:rows.map(({tenant,month:rowMonth,payment})=>{const status=paymentStatus(tenant.rent,payment);return [rowMonth,tenant.name,`${data.properties.find(p=>p.id===tenant.propertyId)?.name||'—'} / ${tenant.unit}`,`BHD ${Number(tenant.rent).toFixed(3)}`,`BHD ${amountCollected(payment).toFixed(3)}`,`BHD ${amountOutstanding(tenant.rent,payment).toFixed(3)}`,status==='paid'?'Paid':status==='partial'?'Partially paid':'Unpaid']}),styles:{fontSize:8},headStyles:{fillColor:[31,91,68]},alternateRowStyles:{fillColor:[242,246,243]}});doc.save(`rent-realm-payment-summary-${allMonths?'all-months':month}.pdf`)};
@@ -499,6 +521,7 @@ function App({ authMode='login', onBack, initialPage='dashboard' }) {
 
 function Root() {
  const [access,setAccess]=useState(null);
+ const [recovery,setRecovery]=useState(()=>new URLSearchParams(window.location.search).has('reset-password')||new URLSearchParams(window.location.hash.slice(1)).get('type')==='recovery');
  const [appPage,setAppPage]=useState('dashboard');
  const [sessionChecking,setSessionChecking]=useState(supabaseConfigured);
  const [activeSession,setActiveSession]=useState(null);
@@ -508,10 +531,12 @@ function Root() {
   if(!supabaseConfigured){setSessionChecking(false);return}
   let active=true;
   supabase.auth.getSession().then(({data:{session}})=>{if(!active)return;setActiveSession(session);if(session)setAccess('login')}).finally(()=>{if(active)setSessionChecking(false)});
-  const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{if(active)setActiveSession(session)});
+  const {data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{if(active){setActiveSession(session);if(event==='PASSWORD_RECOVERY')setRecovery(true)}});
   return()=>{active=false;subscription.unsubscribe()};
  },[]);
  if(sessionChecking)return <main className="portfolio-loading"><div className="brand"><span className="brand-mark"><Building2 size={20}/></span>Rent Realm</div></main>;
+ const finishRecovery=()=>{const url=new URL(window.location.href);url.searchParams.delete('reset-password');url.hash='';window.history.replaceState({},'',url);setRecovery(false);setAccess('login')};
+ if(recovery)return <Auth key={activeSession?'recover':'expired'} lang={lang} setLang={setLang} hasAccounts={false} initialMode={activeSession?'recover':'forgot'} onPasswordUpdated={finishRecovery} onBack={finishRecovery}/>;
  if(!access)return <LandingPage lang={lang} setLang={setLang} onAccess={setAccess} onNavigate={page=>{setAppPage(page);setAccess('login')}} hasSession={Boolean(activeSession)}/>;
  return <App authMode={access} initialPage={appPage} onBack={()=>setAccess(null)}/>;
 }
